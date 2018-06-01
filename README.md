@@ -12,7 +12,7 @@ wget -c http://ftp.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-7.7p1.tar.gz
 # the default provided doesn't work properly on centos 6.5
 tar zxvf openssh-7.7p1.tar.gz
 cp /etc/pam.d/sshd openssh-7.7p1/contrib/redhat/sshd.pam
-mv openssh-7.7p1.tar.gz{,.old}
+mv openssh-7.7p1.tar.gz{,.orig}
 tar zcpf openssh-7.7p1.tar.gz openssh-7.7p1
 cd
 tar zxvf ~/rpmbuild/SOURCES/openssh-7.7p1.tar.gz openssh-7.7p1/contrib/redhat/openssh.spec
