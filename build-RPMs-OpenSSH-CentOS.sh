@@ -1,9 +1,12 @@
 #!/bin/bash
-# Build OpenSSH RPM for CentOS 6.5
+# Build OpenSSH RPM for CentOS 6|7
+# test ok on Centos 6|7 with openssh version {7.9p1,8.0p1}
 if [[ $EUID -ne 0 ]]; then
     echo "Please run as root"
     exit 1
 fi
+
+rhel_version=`rpm -q --queryformat '%{VERSION}' centos-release`
 
 if [ ! -x $1 ]; then
     version=$1
@@ -11,7 +14,7 @@ else
     echo "Usage: sh $0 {openssh-version}(default is 7.9p1)"
     echo "version not provided '7.9p1' will be used."
     while true; do
-        read -p "Do you want to continue (Y/N)? " yn
+        read -p "Do you want to continue [y/N]: " yn
         case $yn in
             [Yy]* ) version="7.9p1"; break;;
             [Nn]* ) exit ;;
@@ -45,14 +48,14 @@ function build_RPMs(){
     #if encounter build error with the follow line, comment it.
     sed -i -e "s/PreReq: initscripts >= 5.00/#PreReq: initscripts >= 5.00/g" openssh.spec
     #CentOS 7
-    if [ `rpm -q --queryformat '%{VERSION}' centos-release` -eq "7" ]; then
+    if [ "${rhel_version}" -eq "7" ]; then
         sed -i -e "s/BuildRequires: openssl-devel < 1.1/#BuildRequires: openssl-devel < 1.1/g" openssh.spec
     fi
     rpmbuild -ba openssh.spec
     cd /root/rpmbuild/RPMS/x86_64/
-    tar zcvf openssh-${version}-RPMs.tar.gz openssh*
-    mv openssh-${version}-RPMs.tar.gz ~ && rm -rf ~/rpmbuild ~/openssh-${version}
-    # openssh-${version}-RPMs.tar.gz ready for use.
+    tar zcvf openssh-${version}-RPMs.el${rhel_version}.tar.gz openssh*
+    mv openssh-${version}-RPMs.el${rhel_version}.tar.gz ~ && rm -rf ~/rpmbuild ~/openssh-${version}
+    # openssh-${version}-RPMs.el${rhel_version}.tar.gz ready for use.
 
 }
 
@@ -60,12 +63,12 @@ function upgrade_openssh(){
     cd /tmp
     mkdir openssh && cd openssh
     timestamp=$(date +%s)
-    if [ ! -f ~/openssh-${version}-RPMs.tar.gz ]; then 
-        echo "~/openssh-${version}-RPMs.tar.gz not exist" 
+    if [ ! -f ~/openssh-${version}-RPMs.el${rhel_version}.tar.gz ]; then 
+        echo "~/openssh-${version}-RPMs.el${rhel_version}.tar.gz not exist" 
         exit 1
     fi
-    cp ~/openssh-${version}-RPMs.tar.gz ./
-    tar zxf openssh-${version}-RPMs.tar.gz 
+    cp ~/openssh-${version}-RPMs.el${rhel_version}.tar.gz ./
+    tar zxf openssh-${version}-RPMs.el${rhel_version}.tar.gz 
     cp /etc/pam.d/sshd pam-ssh-conf-${timestamp}
     rpm -U *.rpm
     mv /etc/pam.d/sshd /etc/pam.d/sshd_${timestamp}
@@ -83,10 +86,10 @@ function upgrade_openssh(){
 }
 
 function main(){
-    if [ -f ~/openssh-${version}-RPMs.tar.gz ];then
-        echo "openssh-${version}-RPMs.tar.gz file already exist, do you want to build again?"
+    if [ -f ~/openssh-${version}-RPMs.el${rhel_version}.tar.gz ];then
+        echo "openssh-${version}-RPMs.el${rhel_version}.tar.gz file already exist, do you want to build again?"
         while true; do
-            read -p "Continue build (Y/N)? " yn
+            read -p "Continue build [y/N]: " yn
             case $yn in
                 [Yy]* ) build_RPMs; break;;
                 [Nn]* ) break ;;
@@ -100,7 +103,7 @@ function main(){
     fi
 
     while true; do
-        read -p "Do you want to install update now (Y/N)? " yn
+        read -p "Do you want to install update now [y/N]: " yn
         case $yn in
             [Yy]* ) upgrade_openssh; break;;
             [Nn]* ) exit ;;
