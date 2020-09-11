@@ -2,44 +2,47 @@
 
 ---
 
+## Usage
+
+```bash
+bash <(curl -sSL https://github.com/Junyangz/upgrade-openssh-centos/raw/master/build-RPMs-OpenSSH-CentOS.sh) \
+    --version 8.3p1  \
+    --output_rpm_dir /tmp/tmp.dirs \
+    --upgrade_now yes
+```
+
 ## Build RPMs
 
 ```bash
-rhel_version=`rpm -q --queryformat '%{VERSION}' centos-release`
-version="8.0p1"
-yum install -y pam-devel rpm-build rpmdevtools zlib-devel openssl-devel krb5-devel gcc wget
-mkdir -p ~/rpmbuild/SOURCES && cd ~/rpmbuild/SOURCES
+build_RPMs() {
+    local output_rpm_dir="${1}"
+    yum install -y pam-devel rpm-build rpmdevtools zlib-devel openssl-devel krb5-devel gcc wget libx11-dev gtk2-devel libXt-devel
+    mkdir -p ~/rpmbuild/SOURCES && cd ~/rpmbuild/SOURCES
+    
+    wget -c https://mirrors.tuna.tsinghua.edu.cn/OpenBSD/OpenSSH/portable/openssh-${version}.tar.gz
+    wget -c https://mirrors.tuna.tsinghua.edu.cn/OpenBSD/OpenSSH/portable/openssh-${version}.tar.gz.asc
+    wget -c https://mirrors.tuna.tsinghua.edu.cn/slackware/slackware64-current/source/xap/x11-ssh-askpass/x11-ssh-askpass-1.2.4.1.tar.gz
 
-wget -c https://mirrors.tuna.tsinghua.edu.cn/OpenBSD/OpenSSH/portable/openssh-${version}.tar.gz
-wget -c https://mirrors.tuna.tsinghua.edu.cn/OpenBSD/OpenSSH/portable/openssh-${version}.tar.gz.asc
-wget -c https://mirrors.tuna.tsinghua.edu.cn/slackware/slackware64-current/source/xap/x11-ssh-askpass/x11-ssh-askpass-1.2.4.1.tar.gz
-# # verify the file
+    tar zxvf openssh-${version}.tar.gz
+    yes | cp /etc/pam.d/sshd openssh-${version}/contrib/redhat/sshd.pam
+    mv openssh-${version}.tar.gz{,.orig}
+    tar zcpf openssh-${version}.tar.gz openssh-${version}
+    cd
+    tar zxvf ~/rpmbuild/SOURCES/openssh-${version}.tar.gz openssh-${version}/contrib/redhat/openssh.spec
 
-# update the pam sshd from the one included on the system
-# the default provided doesn't work properly on CentOS 6.5
-tar zxvf openssh-${version}.tar.gz
-yes | cp /etc/pam.d/sshd openssh-${version}/contrib/redhat/sshd.pam
-mv openssh-${version}.tar.gz{,.orig}
-tar zcpf openssh-${version}.tar.gz openssh-${version}
-cd
-tar zxvf ~/rpmbuild/SOURCES/openssh-${version}.tar.gz openssh-${version}/contrib/redhat/openssh.spec
-# edit the specfile
-cd openssh-${version}/contrib/redhat/
-chown root.root openssh.spec
-sed -i -e "s/%define no_gnome_askpass 0/%define no_gnome_askpass 1/g" openssh.spec
-sed -i -e "s/%define no_x11_askpass 0/%define no_x11_askpass 1/g" openssh.spec
-sed -i -e "s/BuildPreReq/BuildRequires/g" openssh.spec
-#if encounter build error with the follow line, comment it.
-sed -i -e "s/PreReq: initscripts >= 5.00/#PreReq: initscripts >= 5.00/g" openssh.spec
-#CentOS 7
-if [ "${rhel_version}" -eq "7" ]; then
+    cd openssh-${version}/contrib/redhat/ && chown root.root openssh.spec
+    sed -i -e "s/%define no_gnome_askpass 0/%define no_gnome_askpass 1/g" openssh.spec
+    sed -i -e "s/%define no_x11_askpass 0/%define no_x11_askpass 1/g" openssh.spec
+    sed -i -e "s/BuildPreReq/BuildRequires/g" openssh.spec
+    sed -i -e "s/PreReq: initscripts >= 5.00/#PreReq: initscripts >= 5.00/g" openssh.spec
     sed -i -e "s/BuildRequires: openssl-devel < 1.1/#BuildRequires: openssl-devel < 1.1/g" openssh.spec
-fi
-rpmbuild -ba openssh.spec
-cd /root/rpmbuild/RPMS/x86_64/
-tar zcvf openssh-${version}-RPMs.el${rhel_version}.tar.gz openssh*
-mv openssh-${version}-RPMs.el${rhel_version}.tar.gz ~ && rm -rf ~/rpmbuild ~/openssh-${version}
-# openssh-${version}-RPMs.el${rhel_version}.tar.gz ready for use.
+    sed -i -e "/check-files/ s/^#*/#/"  /usr/lib/rpm/macros
+
+    rpmbuild -ba openssh.spec
+    cd /root/rpmbuild/RPMS/x86_64/
+    tar zcvf ${output_rpm_dir}/openssh-${version}-RPMs.el${rhel_version}.tar.gz openssh*
+    rm -rf ~/rpmbuild ~/openssh-${version}
+}
 ```
 
 ---
@@ -47,29 +50,28 @@ mv openssh-${version}-RPMs.el${rhel_version}.tar.gz ~ && rm -rf ~/rpmbuild ~/ope
 ## Update with RPMs
 
 ```bash
-cd /tmp
-mkdir openssh && cd openssh
-timestamp=$(date +%s)
-if [ ! -f ~/openssh-${version}-RPMs.el${rhel_version}.tar.gz ]; then 
-    echo "~/openssh-${version}-RPMs.el${rhel_version}.tar.gz not exist" 
-    exit 1
-fi
-cp ~/openssh-${version}-RPMs.el${rhel_version}.tar.gz ./
-tar zxf openssh-${version}-RPMs.el${rhel_version}.tar.gz 
-cp /etc/pam.d/sshd pam-ssh-conf-${timestamp}
-rpm -U *.rpm
-mv /etc/pam.d/sshd /etc/pam.d/sshd_${timestamp}
-yes | cp pam-ssh-conf-${timestamp} /etc/pam.d/sshd
-#sed -i 's/#PermitRootLogin yes/PermitRootLogin yes/g' /etc/ssh/sshd_config
-if [ "${rhel_version}" -eq "7" ]; then
+upgrade_openssh() {
+    local temp_dir="$(mktemp -d)"
+    local output_rpm_dir="$1"
+    trap "rm -rf ${temp_dir}" EXIT
+    pushd "${temp_dir}"
+
+    timestamp=$(date +%s)
+    if [ ! -f ${output_rpm_dir}/openssh-${version}-RPMs.el${rhel_version}.tar.gz ]; then
+        echo "${output_rpm_dir}/openssh-${version}-RPMs.el${rhel_version}.tar.gz not exist"
+        exit 1
+    fi
+    cp ${output_rpm_dir}/openssh-${version}-RPMs.el${rhel_version}.tar.gz ./
+    tar zxf openssh-${version}-RPMs.el${rhel_version}.tar.gz
+    cp /etc/pam.d/sshd pam-ssh-conf-${timestamp}
+    rpm -U *.rpm
+    mv /etc/pam.d/sshd /etc/pam.d/sshd_${timestamp}
+    yes | cp pam-ssh-conf-${timestamp} /etc/pam.d/sshd
+    sed -i '/PermitRootLogin yes/ s/^#*//'  /etc/ssh/sshd_config
     chmod 600 /etc/ssh/ssh*
-    systemctl restart sshd.service
-else
     /etc/init.d/sshd restart
-fi
-cd
-rm -rf /tmp/openssh
-echo "New version upgrades as to lastest:" && $(ssh -V)
+    echo "New version upgrades as to lastest:" ; $(ssh -V)
+}
 ```
 
 ---
