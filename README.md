@@ -1,6 +1,6 @@
 # Upgrade OpenSSH for CentOS
 
----
+Support the OpenSSH version {7.9p1,8.0p1,8.1p1,8.2p1,8.3p1}.
 
 ## Usage
 
@@ -45,9 +45,7 @@ build_RPMs() {
 }
 ```
 
----
-
-## Update with RPMs
+## Upgrade with RPMs
 
 ```bash
 upgrade_openssh() {
@@ -73,8 +71,6 @@ upgrade_openssh() {
     echo "New version upgrades as to lastest:" ; $(ssh -V)
 }
 ```
-
----
 
 More information please refer `build-RPMs-OpenSSH-CentOS.sh` script.
 
