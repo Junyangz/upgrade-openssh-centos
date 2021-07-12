@@ -4,6 +4,8 @@ Support the OpenSSH version {7.9p1,8.0p1,8.1p1,8.2p1,8.3p1}.
 
 ## Usage
 
+The `--output_rpm_dir` option must be specified.
+
 ```bash
 bash <(curl -sSL https://github.com/Junyangz/upgrade-openssh-centos/raw/master/build-RPMs-OpenSSH-CentOS.sh) \
     --version 8.3p1  \
