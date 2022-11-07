@@ -46,7 +46,7 @@ usage() {
 
 build_RPMs() {
     local output_rpm_dir="${1}"
-    yum install -y pam-devel rpm-build rpmdevtools zlib-devel openssl-devel krb5-devel gcc wget libx11-dev gtk2-devel libXt-devel
+    yum install -y pam-devel rpm-build rpmdevtools zlib-devel openssl-devel krb5-devel gcc wget libx11-dev gtk2-devel libXt-devel imake ca-certificates
     mkdir -p ~/rpmbuild/SOURCES && cd ~/rpmbuild/SOURCES
 
     wget -c https://mirrors.tuna.tsinghua.edu.cn/OpenBSD/OpenSSH/portable/openssh-${version}.tar.gz
